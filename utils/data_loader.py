@@ -5,6 +5,7 @@ import pandas as pd
 import datasets
 import json
 import pickle
+from sklearn.model_selection import train_test_split
 
 ###
 # Load Crema
@@ -235,9 +236,25 @@ def load_cmu_mosei(dataset_path):
             data_dict[label_dict[i]].append(label)
             
     cmu_mosei_df = pd.DataFrame(data_dict)
+    cmu_mosei_df['age'] = -1
     return cmu_mosei_df
 
-def aggregate_datasets(dataset_path):
+###
+# Split dataset into train, valid, & test
+###
+def assign_dataset_split(df, val_size, test_size, stratify_col='gender', seed=0):
+    tr_val_df, test_df = train_test_split(df, stratify=df[stratify_col], test_size=test_size, random_state=seed)
+    train_df, valid_df = train_test_split(tr_val_df, stratify=tr_val_df[stratify_col], test_size=val_size, random_state=seed)
+    train_df.loc[:,'split'] = 'train'
+    valid_df.loc[:,'split'] = 'valid'
+    test_df.loc[:,'split'] = 'test'
+    
+    return pd.concat([train_df, valid_df, test_df])
+
+###
+# Function to retrieve and aggregate datasets
+###
+def retrieve_aggregate_datasets(dataset_path):
     # Load datasets
     crema_df = load_crema(dataset_path)
     elder_df = load_elder_react(dataset_path)
@@ -256,9 +273,45 @@ def aggregate_datasets(dataset_path):
     iemocap_df['dataset'] = 'iemocap'
     cmu_mosei_df['dataset'] = 'cmu_mosei'
 
-    # Combined DataFrame
-    combined_df = pd.concat([crema_df, elder_df, esd_df, csed_df, tess_df, iemocap_df, cmu_mosei_df])
+    # Add age group
+    elderly_threshold = 60
+    def get_age_group(age):
+        if age == -1:
+            return 'unknown'
+        elif age >= elderly_threshold:
+            return 'elderly'  
+        else: 
+            return 'others'
 
+    crema_df['age_group'] = crema_df['age'].apply(get_age_group)
+    elder_df['age_group'] = elder_df['age'].apply(get_age_group)
+    esd_df['age_group'] = esd_df['age'].apply(get_age_group)
+    csed_df['age_group'] = csed_df['age'].apply(get_age_group)
+    tess_df['age_group'] = tess_df['age'].apply(get_age_group)
+    iemocap_df['age_group'] = iemocap_df['age'].apply(get_age_group)
+    cmu_mosei_df['age_group'] = cmu_mosei_df['age'].apply(get_age_group)
+
+    # Split Elderly and Others
+    crema_elderly_df = crema_df[crema_df['age_group'] == 'elderly']
+    crema_others_df = crema_df[crema_df['age_group'] == 'others']
+    tess_elderly_df = tess_df[tess_df['age_group'] == 'elderly']
+    tess_others_df = tess_df[tess_df['age_group'] == 'others']
+    
+    # Assign Split
+    csed_df = assign_dataset_split(csed_df, val_size=52, test_size=400)
+    crema_elderly_df = assign_dataset_split(crema_elderly_df, val_size=42, test_size=300)
+    crema_others_df = assign_dataset_split(crema_others_df, val_size=750, test_size=1200)
+    tess_elderly_df = assign_dataset_split(tess_elderly_df, val_size=200, test_size=500)
+    tess_others_df = assign_dataset_split(tess_others_df, val_size=201, test_size=500)
+    iemocap_df = assign_dataset_split(iemocap_df, val_size=1039, test_size=1500)
+    cmu_mosei_df = assign_dataset_split(cmu_mosei_df, val_size=1259, test_size=2000, stratify_col='age_group')
+
+    # Combined DataFrame
+    combined_df = pd.concat([
+        crema_others_df, crema_elderly_df, elder_df, esd_df, csed_df, 
+        tess_others_df, tess_elderly_df, iemocap_df, cmu_mosei_df
+    ])
+    
     # Preprocess empty value
     numeric_columns = [
         'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral',  
@@ -272,15 +325,53 @@ def aggregate_datasets(dataset_path):
         else:
             combined_df[[column]] = combined_df[[column]].fillna('unknown')
 
-    # Preprocess age to age_group
-    elderly_threshold = 60
-    def get_age_group(age):
-        if age == -1:
-            return 'unknown'
-        elif age >= elderly_threshold:
-            return 'elderly'  
-        else: 
-            return 'others'
-    combined_df['age_group'] = combined_df['age'].apply(get_age_group)
-
+    # Return the merged DataFrame
     return combined_df
+
+###
+# Convert DataFrame to HF Dataset
+###
+def df_to_dataset(df):
+    return datasets.Dataset.from_pandas(df).cast_column("audio", datasets.features.Audio(sampling_rate=16000))
+
+###
+# Main Function for Dataset Loading
+###
+def load_dataset(dataset_path):
+    combined_df = retrieve_aggregate_datasets(dataset_path)
+    
+    en_others_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'others')]
+    en_elderly_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'elderly')]
+    zh_others_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'others')]
+    zh_elderly_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'elderly')]
+    
+    trn_en_others_df = en_others_df.loc[en_others_df['split'] == 'train']
+    val_en_others_df = en_others_df.loc[en_others_df['split'] == 'valid']
+    tst_en_others_df = en_others_df.loc[en_others_df['split'] == 'test']
+    
+    trn_en_elderly_df = en_elderly_df.loc[en_elderly_df['split'] == 'train']
+    val_en_elderly_df = en_elderly_df.loc[en_elderly_df['split'] == 'valid']
+    tst_en_elderly_df = en_elderly_df.loc[en_elderly_df['split'] == 'test']
+    
+    trn_zh_others_df = zh_others_df.loc[zh_others_df['split'] == 'train']
+    val_zh_others_df = zh_others_df.loc[zh_others_df['split'] == 'valid']
+    tst_zh_others_df = zh_others_df.loc[zh_others_df['split'] == 'test']
+    
+    trn_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'train']
+    val_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'valid']
+    tst_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'test']
+    
+    return (
+                df_to_dataset(trn_en_others_df), df_to_dataset(val_en_others_df), {
+                dset: df_to_dataset(df) for dset, df in tst_en_others_df.groupby('dataset')
+            }), (
+                df_to_dataset(trn_en_elderly_df), df_to_dataset(val_en_elderly_df), {
+                dset: df_to_dataset(df) for dset, df in tst_en_elderly_df.groupby('dataset')
+            }), (
+                df_to_dataset(trn_zh_others_df), df_to_dataset(val_zh_others_df), {
+                dset: df_to_dataset(df) for dset, df in tst_zh_others_df.groupby('dataset')
+            }), (
+                df_to_dataset(trn_zh_elderly_df), df_to_dataset(val_zh_elderly_df), {
+                dset: df_to_dataset(df) for dset, df in tst_zh_elderly_df.groupby('dataset')
+            })
+    
