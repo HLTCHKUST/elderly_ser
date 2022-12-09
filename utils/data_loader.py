@@ -361,17 +361,39 @@ def load_dataset(dataset_path):
     val_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'valid']
     tst_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'test']
     
-    return (
-                df_to_dataset(trn_en_others_df), df_to_dataset(val_en_others_df), {
-                dset: df_to_dataset(df) for dset, df in tst_en_others_df.groupby('dataset')
-            }), (
-                df_to_dataset(trn_en_elderly_df), df_to_dataset(val_en_elderly_df), {
-                dset: df_to_dataset(df) for dset, df in tst_en_elderly_df.groupby('dataset')
-            }), (
-                df_to_dataset(trn_zh_others_df), df_to_dataset(val_zh_others_df), {
-                dset: df_to_dataset(df) for dset, df in tst_zh_others_df.groupby('dataset')
-            }), (
-                df_to_dataset(trn_zh_elderly_df), df_to_dataset(val_zh_elderly_df), {
-                dset: df_to_dataset(df) for dset, df in tst_zh_elderly_df.groupby('dataset')
-            })
+    return [
+        {
+            "lang": "eng",
+            "group": "others",
+            "data": (
+                df_to_dataset(trn_en_others_df),
+                df_to_dataset(val_en_others_df),
+                {dset: df_to_dataset(df) for dset, df in tst_en_others_df.groupby('dataset')}
+            )
+        }, {
+            "lang": "eng",
+            "group": "elderly",
+            "data": (
+                df_to_dataset(trn_en_elderly_df),
+                df_to_dataset(val_en_elderly_df),
+                {dset: df_to_dataset(df) for dset, df in tst_en_elderly_df.groupby('dataset')}
+            )
+        }, {
+            "lang": "zho",
+            "group": "others",
+            "data": (
+                df_to_dataset(trn_zh_others_df),
+                df_to_dataset(val_zh_others_df),
+                {dset: df_to_dataset(df) for dset, df in tst_zh_others_df.groupby('dataset')}
+            )
+        }, {
+            "lang": "zho",
+            "group": "elderly",
+            "data": (
+                df_to_dataset(trn_zh_elderly_df),
+                df_to_dataset(val_zh_elderly_df),
+                {dset: df_to_dataset(df) for dset, df in tst_zh_elderly_df.groupby('dataset')}
+            )
+        },
+    ]
     
