@@ -3,19 +3,24 @@ import logging
 import numpy as np
 import pandas as pd
 import argparse
-import torchaudio
+
 import torch
+
 import re
 import json 
-# import transformers
+from utils.args_helper import ModelArguments, DataTrainingArguments, TrainingArguments
 # from datasets import DatasetDict
-from transformers import (AutoProcessor, AutoModelForAudioClassification,    Trainer,Wav2Vec2CTCTokenizer,
+from transformers import (AutoProcessor, AutoModelForAudioClassification, Trainer,Wav2Vec2CTCTokenizer,
     Wav2Vec2Processor, 
     Wav2Vec2CTCTokenizer,
     Wav2Vec2FeatureExtractor,
         Wav2Vec2ForCTC,
     Wav2Vec2Config,
     HfArgumentParser,set_seed)
+
+from transformers.trainer_utils import get_last_checkpoint
+from utils import data_loader
+
 
 # processor = AutoProcessor.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
 
@@ -36,12 +41,12 @@ def main():
     # Parsing & Initialization
     ###
     # Parse argument
-    parser = HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         print(sys.argv)
         model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
     elif len(sys.argv) == 2 and sys.argv[2].endswith(".json"):
-        parser = HfArgumentParser((PreprocessorArgs))
+        parser = HfArgumentParser((TrainingArguments))
         preprocessor_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[2]))
     else:
         model_args, data_args, training_args= parser.parse_args_into_dataclasses()
@@ -86,7 +91,28 @@ def main():
     if is_main_process(training_args.local_rank):
         transformers.utils.logging.set_verbosity(transformers.logging.WARNING)
     logger.info("Training/evaluation parameters %s", training_args)
-    
+
+
+
+    # Initialize our dataset and prepare it for the emotion classification task.
+    data = data_loader.load_dataset(data_args.dataset_path)
+    raw_datasets = {}
+    for d in data:
+        dset = datasets.DatasetDict()
+        dset["train"] = d["data"][0]
+        dset["validation"] = d["data"][1]
+        for test_dset_name, test_dset in d["data"][-1].items():
+            dset[f'test-{test_dset_name}'] = test_dset
+        raw_datasets[f'{d["lang"]}-{d["group"]}'] = dset.copy()
+
+    for k, v in raw_datasets.items():
+        print(f'=== {k} ===')
+        print(v)
+        print()
+
+    print(raw_datasets["zho-elderly"]["test-csed"])
+    print()
+    print(raw_datasets["zho-elderly"]["test-csed"][:3])
 
     train_fn(training_args)
     

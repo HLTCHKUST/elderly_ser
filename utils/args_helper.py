@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Optional
 import warnings
+from transformers import TrainingArguments
 
 @dataclass
 class DataTrainingArguments:
@@ -109,3 +110,17 @@ class ModelArguments:
                 "should not be used in combination with `--freeze_feature_encoder`."
                 "Only make use of `--freeze_feature_encoder`."
             )
+
+@dataclass
+class TrainingArguments(TrainingArguments):
+    """
+    Argument spertraining to the training pipeline.
+    """
+    output_dir:Optional[str]=field(
+    default="./save",
+    metadata={"help":"Output directory"},
+    )
+    eval_accumulation_steps:Optional[int]=field(
+    default=1,
+    metadata={"help":"Evaluation accumulation steps"}
+    )
