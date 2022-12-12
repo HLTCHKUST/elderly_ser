@@ -1,0 +1,12 @@
+torch
+torchvision
+torchaudio
+transformers
+numpy
+pandas
+os 
+sys
+re
+json
+logging
+argparse
