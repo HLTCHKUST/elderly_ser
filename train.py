@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def train_fn(model, training_data, feature_extractor, model_args, data_args, training_args ):
+def train_fn(model, train_data, valid_data, feature_extractor, model_args, data_args, training_args ):
 
     training_args.output_dir="{}/{}".format(training_args.output_dir, model_args.model_name_or_path)
 
@@ -38,8 +38,8 @@ def train_fn(model, training_data, feature_extractor, model_args, data_args, tra
 
     # Initialize Trainer
     trainer = Trainer(
-        train_dataset=training_data,
-        eval_dataset=None,
+        train_dataset=train_data,
+        eval_dataset=valid_data,
         model=model,
         # data_collator=data_collator,
         args=training_args,
@@ -66,7 +66,7 @@ def train_fn(model, training_data, feature_extractor, model_args, data_args, tra
     # if is_main_process(training_args.local_rank):
     feature_extractor.save_pretrained(training_args.output_dir)
 
-    metrics = train_result.metrics
+    # metrics = train_result.metrics
 
 
     # trainer.log_metrics("train", metrics)
@@ -81,8 +81,8 @@ def train_fn(model, training_data, feature_extractor, model_args, data_args, tra
     # metrics = trainer.evaluate(eval_dataset=vectorized_datasets["valid"])
     # metrics["eval_samples"] = len(vectorized_datasets["valid"])
 
-    trainer.log_metrics("eval", metrics)
-    trainer.save_metrics("eval", metrics)
+    # trainer.log_metrics("eval", metrics)
+    # trainer.save_metrics("eval", metrics)
     
 
 # def eval_fn(training_args):
@@ -162,23 +162,77 @@ def main():
         for test_dset_name, test_dset in d["data"][-1].items():
             dset[f'test-{test_dset_name}'] = test_dset
         raw_datasets[f'{d["lang"]}-{d["group"]}'] = dset.copy()
+    print(raw_datasets)
 
+
+    input_column="audio"
+    label_list=['sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral']
+    num_labels = len(label_list)
+    
+
+
+    pooling_mode = "mean"
+    print(raw_datasets["eng-others"]["validation"]['audio'])
     # for k, v in raw_datasets.items():
     #     print(f'=== {k} ===')
     #     print(v)
     #     print()
 
+    # config
+    config = AutoConfig.from_pretrained(
+    model_args.model_name_or_path,
+    num_labels=num_labels,
+    label2id={label: i for i, label in enumerate(label_list)},
+    id2label={i: label for i, label in enumerate(label_list)},
+    finetuning_task="wav2vec2_clf",
+    )
+    setattr(config, 'pooling_mode', pooling_mode)
     # print(raw_datasets["zho-elderly"]["test-csed"])
     # print()
     # print(raw_datasets["zho-elderly"]["test-csed"][:3])
     feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
     sampling_rate = feature_extractor.sampling_rate
     model = AutoModelForAudioClassification.from_pretrained(model_args.model_name_or_path).to(device)
+
+    def speech_file_to_array_fn(audio):
+        speech_array, sampling_rate = torchaudio.load(path)
+        resampler = torchaudio.transforms.Resample(sampling_rate, target_sampling_rate)
+        speech = resampler(speech_array).squeeze().numpy()
+        return speech
+
+    def label_to_id(label, label_list):
+
+        if len(label_list) > 0:
+            return label_list.index(label) if label in label_list else -1
+
+        return label
+
+    def preprocess_function(examples):
+        speech_list = [speech_file_to_array_fn(path) for path in examples[input_column]]
+        target_list = [label_to_id(label, label_list) for label in examples[output_column]]
+
+        result = processor(speech_list, sampling_rate=target_sampling_rate)
+        result["labels"] = list(target_list)
+
+        return result
+
+    train_dataset = train_dataset.map(
+    preprocess_function,
+    batch_size=100,
+    batched=True,
+    num_proc=4
+)   
+    eval_dataset = eval_dataset.map(
+        preprocess_function,
+        batch_size=100,
+        batched=True,
+        num_proc=4
+    )
     # processor = AutoProcessor.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
 
     # model = AutoModelForAudioClassification.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
     
-    train_fn(model, raw_datasets["zho-elderly"]["test-csed"], feature_extractor, model_args, data_args, training_args )
+    train_fn(model, raw_datasets["eng-others"]["train"], raw_datasets["eng-others"]["validation"], feature_extractor, model_args, data_args, training_args )
     
 if __name__ == '__main__':
     main()
