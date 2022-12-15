@@ -3,8 +3,8 @@ import logging
 import numpy as np
 import pandas as pd
 import argparse
-
 import torch
+import torchaudio
 from  transformers.utils.logging import    set_verbosity, enable_default_handler, enable_explicit_format
 import re
 import json 
@@ -14,13 +14,16 @@ from transformers import (AutoProcessor, AutoModelForAudioClassification, Traine
     Wav2Vec2Processor, AutoConfig,
     Wav2Vec2CTCTokenizer,
     Wav2Vec2FeatureExtractor,
-        Wav2Vec2ForCTC,
+    Wav2Vec2ForCTC,
     Wav2Vec2Config,
     HfArgumentParser,set_seed)
 import IPython.display as ipd
 
 from transformers.trainer_utils import get_last_checkpoint
 from utils import data_loader
+from datasets import load_from_disk, set_caching_enabled
+
+set_caching_enabled(True)
 
 
 logger = logging.getLogger(__name__)    
@@ -154,6 +157,7 @@ def main():
 
     # Initialize our dataset and prepare it for the emotion classification task.
     data = data_loader.load_dataset(data_args.dataset_path)
+    
     raw_datasets = {}
     for d in data:
         dset = DatasetDict()
@@ -162,21 +166,17 @@ def main():
         for test_dset_name, test_dset in d["data"][-1].items():
             dset[f'test-{test_dset_name}'] = test_dset
         raw_datasets[f'{d["lang"]}-{d["group"]}'] = dset.copy()
-    print(raw_datasets)
 
 
+    train_dataset=raw_datasets["eng-others"]["train"]
+    eval_dataset=raw_datasets["eng-others"]["validation"]
     input_column="audio"
     label_list=['sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral']
     num_labels = len(label_list)
-    
-
-
     pooling_mode = "mean"
-    print(raw_datasets["eng-others"]["validation"]['audio'])
-    # for k, v in raw_datasets.items():
-    #     print(f'=== {k} ===')
-    #     print(v)
-    #     print()
+
+
+
 
     # config
     config = AutoConfig.from_pretrained(
@@ -187,18 +187,11 @@ def main():
     finetuning_task="wav2vec2_clf",
     )
     setattr(config, 'pooling_mode', pooling_mode)
-    # print(raw_datasets["zho-elderly"]["test-csed"])
-    # print()
-    # print(raw_datasets["zho-elderly"]["test-csed"][:3])
+
     feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
-    sampling_rate = feature_extractor.sampling_rate
+    target_sampling_rate = feature_extractor.sampling_rate
     model = AutoModelForAudioClassification.from_pretrained(model_args.model_name_or_path).to(device)
 
-    def speech_file_to_array_fn(audio):
-        speech_array, sampling_rate = torchaudio.load(path)
-        resampler = torchaudio.transforms.Resample(sampling_rate, target_sampling_rate)
-        speech = resampler(speech_array).squeeze().numpy()
-        return speech
 
     def label_to_id(label, label_list):
 
@@ -207,32 +200,62 @@ def main():
 
         return label
 
-    def preprocess_function(examples):
-        speech_list = [speech_file_to_array_fn(path) for path in examples[input_column]]
-        target_list = [label_to_id(label, label_list) for label in examples[output_column]]
+    def preprocess_function(raw_datasets):
+        speech_list = [item['array'] for item in raw_datasets[input_column]]
+        # target_list = [label_to_id(label, label_list) for label in label_list]
 
-        result = processor(speech_list, sampling_rate=target_sampling_rate)
+        # # target_list = list(map(lambda x: x==1.0, raw_datasets[label_list]))
+    
+    # # print(eval_dataset['sadness'][0],
+    # # eval_dataset['fear'][0],
+    # # eval_dataset['angry'][0],
+    # # eval_dataset['happiness'][0],
+    # # eval_dataset['disgust'][0],
+    # # eval_dataset['neutral'][0])
+    # list_emo=[eval_dataset['sadness'],
+    # eval_dataset['fear'],
+    # eval_dataset['angry'],
+    # eval_dataset['happiness'],
+    # eval_dataset['disgust'],
+    # eval_dataset['neutral']]
+    # target_list=eval_dataset.index(1.0)
+
+
+        result = feature_extractor(speech_list, sampling_rate=target_sampling_rate)
         result["labels"] = list(target_list)
 
         return result
 
+
+
+
     train_dataset = train_dataset.map(
-    preprocess_function,
-    batch_size=100,
-    batched=True,
-    num_proc=4
-)   
+        preprocess_function,
+        batch_size=6,
+        batched=True,
+        num_proc=4
+    )   
+    # eval_dataset=raw_datasets["eng-others"]["validation"]["audio"]
     eval_dataset = eval_dataset.map(
         preprocess_function,
-        batch_size=100,
+        batch_size=6,
         batched=True,
         num_proc=4
     )
+    idx = 0
+    print(f"Training input_values: {train_dataset[idx]['input_values']}")
+    print(f"Training attention_mask: {train_dataset[idx]['attention_mask']}")
+    print(f"Training labels: {train_dataset[idx]['labels']} - {train_dataset[idx]['emotion']}")
     # processor = AutoProcessor.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
 
     # model = AutoModelForAudioClassification.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
-    
-    train_fn(model, raw_datasets["eng-others"]["train"], raw_datasets["eng-others"]["validation"], feature_extractor, model_args, data_args, training_args )
+    if not os.path.exists("{}/preprocess_data.arrow".format(model_args.cache_dir_path)):
+        vectorized_datasets.save_to_disk("{}/preprocess_data.arrow".format(model_args.cache_dir_path))
+    else:
+        print('Loading cached dataset...')
+        vectorized_datasets = datasets.load_from_disk('{}/preprocess_data.arrow'.format(model_args.cache_dir_path))
+
+    train_fn(model, train_dataset, eval_dataset, feature_extractor, model_args, data_args, training_args )
     
 if __name__ == '__main__':
     main()
