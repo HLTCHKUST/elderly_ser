@@ -16,6 +16,8 @@ from transformers import (AutoProcessor, AutoModelForAudioClassification, Traine
     Wav2Vec2FeatureExtractor,
     Wav2Vec2ForCTC,
     Wav2Vec2Config,
+    WhisperProcessor,
+    WhisperForConditionalGeneration,
     HfArgumentParser,set_seed)
 import IPython.display as ipd
 
@@ -176,22 +178,34 @@ def main():
     pooling_mode = "mean"
 
 
-
-
-    # config
+    # Config
     config = AutoConfig.from_pretrained(
-    model_args.model_name_or_path,
-    num_labels=num_labels,
-    label2id={label: i for i, label in enumerate(label_list)},
-    id2label={i: label for i, label in enumerate(label_list)},
-    finetuning_task="wav2vec2_clf",
+        model_args.model_name_or_path,
+        num_labels=num_labels,
+        label2id={label: i for i, label in enumerate(label_list)},
+        id2label={i: label for i, label in enumerate(label_list)}
     )
     setattr(config, 'pooling_mode', pooling_mode)
 
-    feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
-    target_sampling_rate = feature_extractor.sampling_rate
-    model = AutoModelForAudioClassification.from_pretrained(model_args.model_name_or_path).to(device)
+    # Model Prepare
+    if 'wav2vec' in model_args.model_name_or_path:
+        feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
+        target_sampling_rate = feature_extractor.sampling_rate
+        model = AutoModelForAudioClassification.from_pretrained(model_args.model_name_or_path).to(device)
+    else:
+        processor = WhisperProcessor.from_pretrained(model_args.model_name_or_path)
+        model = WhisperForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
 
+# # load dummy dataset and read soundfiles
+# ds = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+# input_features = processor(ds[0]["audio"]["array"], return_tensors="pt").input_features 
+
+# # Generate logits
+# logits = model(input_features, decoder_input_ids = torch.tensor([[50258]])).logits 
+# # take argmax and decode
+# predicted_ids = torch.argmax(logits, dim=-1)
+# transcription = processor.batch_decode(predicted_ids)
+# ['<|en|>']
 
     def label_to_id(label, label_list):
 
@@ -235,17 +249,18 @@ def main():
         batched=True,
         num_proc=4
     )   
-    # eval_dataset=raw_datasets["eng-others"]["validation"]["audio"]
     eval_dataset = eval_dataset.map(
         preprocess_function,
         batch_size=6,
         batched=True,
         num_proc=4
     )
+
     idx = 0
     print(f"Training input_values: {train_dataset[idx]['input_values']}")
     print(f"Training attention_mask: {train_dataset[idx]['attention_mask']}")
     print(f"Training labels: {train_dataset[idx]['labels']} - {train_dataset[idx]['emotion']}")
+    
     # processor = AutoProcessor.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
 
     # model = AutoModelForAudioClassification.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
