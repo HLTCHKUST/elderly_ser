@@ -96,6 +96,10 @@ class ModelArguments:
         default=False,
         metadata={"help": "Will enable to load a pretrained model whose head dimensions are different."},
     )
+    checkpoint_path: Optional[str] = field(
+        default=None,
+        metadata={"help": "Checkpoint"}
+    )
 
     def __post_init__(self):
         if not self.freeze_feature_extractor and self.freeze_feature_encoder:

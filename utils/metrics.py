@@ -5,11 +5,11 @@ import collections
 import numpy as np
 
 
-def flatten_dict(d, parent_key='', sep='_'):
+def flatten(d, parent_key='', sep='_'):
     items = []
     for k, v in d.items():
         new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, collections.MutableMapping):
+        if isinstance(v, collections.abc.MutableMapping):
             items.extend(flatten(v, new_key, sep=sep).items())
         else:
             items.append((new_key, v))
@@ -21,7 +21,17 @@ def compute_metrics(p: EvalPrediction):
     preds = np.array(preds).astype('int32')
     label_ids = np.array(p.label_ids).astype('int32')
 
-    classification_report = classification_report(label_ids, preds, output_dict=True)
-    metrics = flatten_dict(classification_report)
+    report = classification_report(label_ids, preds, output_dict=True)
+    metrics = flatten(report)
 
     return metrics
+
+    # # Load the accuracy metric from the datasets package
+    # metric = evaluate.load("accuracy")
+
+    # # Define our compute_metrics function. It takes an `EvalPrediction` object (a namedtuple with
+    # # `predictions` and `label_ids` fields) and has to return a dictionary string to float.
+    # def compute_metrics(eval_pred):
+    #     """Computes accuracy on a batch of predictions"""
+    #     predictions = np.argmax(eval_pred.predictions, axis=1)
+    #     return metric.compute(predictions=predictions, references=eval_pred.label_ids)
