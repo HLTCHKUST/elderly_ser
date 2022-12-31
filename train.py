@@ -5,12 +5,14 @@ import pandas as pd
 import argparse
 import torch
 import torchaudio
-from  transformers.utils.logging import    set_verbosity, enable_default_handler, enable_explicit_format
+from  transformers.utils.logging import set_verbosity, enable_default_handler, enable_explicit_format
 import re
 import json 
 from utils.args_helper import ModelArguments, DataTrainingArguments, TrainingArguments
-from datasets import DatasetDict
-from transformers import (AutoProcessor, AutoModelForAudioClassification, Trainer, Wav2Vec2FeatureExtractor,
+from datasets import DatasetDict, concatenate_datasets
+from transformers import (
+    AutoProcessor, AutoModelForAudioClassification, 
+    Trainer, Wav2Vec2FeatureExtractor,
     Wav2Vec2Processor, AutoConfig,
     Wav2Vec2CTCTokenizer,
     Wav2Vec2FeatureExtractor,
@@ -18,12 +20,16 @@ from transformers import (AutoProcessor, AutoModelForAudioClassification, Traine
     Wav2Vec2Config,
     WhisperProcessor,
     WhisperForConditionalGeneration,
-    HfArgumentParser,set_seed)
+    HfArgumentParser,set_seed,
+    EarlyStoppingCallback
+)
+
 import IPython.display as ipd
 
 from transformers.trainer_utils import get_last_checkpoint
 from utils import data_loader
 from datasets import load_from_disk, set_caching_enabled
+from utils.metrics import compute_metrics
 
 set_caching_enabled(True)
 
@@ -31,69 +37,7 @@ set_caching_enabled(True)
 logger = logging.getLogger(__name__)    
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def train_fn(model, train_data, valid_data, feature_extractor, model_args, data_args, training_args ):
-
-    training_args.output_dir="{}/{}".format(training_args.output_dir, model_args.model_name_or_path)
-
-    os.makedirs(training_args.output_dir, exist_ok=True)
-
-    cache_dir_path = "./{}/{}".format(model_args.cache_dir, model_args.model_name_or_path)
-    os.makedirs(cache_dir_path, exist_ok=True)
-
-    # Initialize Trainer
-    trainer = Trainer(
-        train_dataset=train_data,
-        eval_dataset=valid_data,
-        model=model,
-        # data_collator=data_collator,
-        args=training_args,
-        # compute_metrics=compute_metrics,
-        tokenizer=feature_extractor,
-        # callbacks=[EarlyStoppingCallback(early_stopping_patience=5)]
-    )
-
-    ###
-    # Training Phase
-    ###
-    print('*** Training Phase ***')
-    
-    # use last checkpoint if exist
-    if os.path.isdir(model_args.model_name_or_path):
-        checkpoint = model_args.model_name_or_path
-    else:
-        checkpoint = None
-
-    train_result = trainer.train(resume_from_checkpoint=checkpoint)
-    trainer.save_model()
-
-    # Save the feature_extractor and the tokenizer
-    # if is_main_process(training_args.local_rank):
-    feature_extractor.save_pretrained(training_args.output_dir)
-
-    # metrics = train_result.metrics
-
-
-    # trainer.log_metrics("train", metrics)
-    # trainer.save_metrics("train", metrics)
-    trainer.save_state()
-    
-    ###
-    # Evaluation Phase
-    ###
-    results = {}
-    logger.info("*** Evaluation Phase ***")
-    # metrics = trainer.evaluate(eval_dataset=vectorized_datasets["valid"])
-    # metrics["eval_samples"] = len(vectorized_datasets["valid"])
-
-    # trainer.log_metrics("eval", metrics)
-    # trainer.save_metrics("eval", metrics)
-    
-
 # def eval_fn(training_args):
-    
-
-
 
 #####
 # Entry Point
@@ -110,7 +54,16 @@ def main():
     else:
         model_args, data_args, training_args= parser.parse_args_into_dataclasses()
 
-
+    # Set directory path
+    training_args.output_dir="{}/{}_{}_{}".format(
+        training_args.output_dir, data_args.training_language, data_args.training_age_group, model_args.model_name_or_path
+    )
+    cache_dir_path = "./{}/{}_{}_{}".format(
+        model_args.cache_dir, data_args.training_language, data_args.training_age_group, model_args.model_name_or_path
+    )
+    os.makedirs(training_args.output_dir, exist_ok=True)
+    os.makedirs(cache_dir_path, exist_ok=True)
+    
     # Set random seed
     set_seed(training_args.seed)
     
@@ -147,7 +100,6 @@ def main():
     enable_default_handler()
     enable_explicit_format()
 
-
     # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, n_gpu: {training_args.n_gpu} "
@@ -155,39 +107,79 @@ def main():
     )
     logger.info(f"Training/evaluation parameters {training_args}")
 
+    ###
+    # Loading  Dataset
+    ###
+    # data_loader.load_dataset => return [
+    #     {
+    #         "lang": "eng",
+    #         "group": "others",
+    #         "data": (
+    #             df_to_dataset(trn_en_others_df),
+    #             df_to_dataset(val_en_others_df),
+    #             {dset: df_to_dataset(df) for dset, df in tst_en_others_df.groupby('dataset')}
+    #         )
+    #     }, {
+    #         "lang": "eng",
+    #         "group": "elderly",
+    #         "data": (
+    #             df_to_dataset(trn_en_elderly_df),
+    #             df_to_dataset(val_en_elderly_df),
+    #             {dset: df_to_dataset(df) for dset, df in tst_en_elderly_df.groupby('dataset')}
+    #         )
+    #     }, {
+    #         "lang": "zho",
+    #         "group": "others",
+    #         "data": (
+    #             df_to_dataset(trn_zh_others_df),
+    #             df_to_dataset(val_zh_others_df),
+    #             {dset: df_to_dataset(df) for dset, df in tst_zh_others_df.groupby('dataset')}
+    #         )
+    #     }, {
+    #         "lang": "zho",
+    #         "group": "elderly",
+    #         "data": (
+    #             df_to_dataset(trn_zh_elderly_df),
+    #             df_to_dataset(val_zh_elderly_df),
+    #             {dset: df_to_dataset(df) for dset, df in tst_zh_elderly_df.groupby('dataset')}
+    #         )
+    #     },
+    # ]
 
-
-    # Initialize our dataset and prepare it for the emotion classification task.
-    data = data_loader.load_dataset(data_args.dataset_path)
+    dataset_dict = data_loader.load_dataset(data_args.dataset_path)
     
-    raw_datasets = {}
-    for d in data:
-        dset = DatasetDict()
-        dset["train"] = d["data"][0]
-        dset["validation"] = d["data"][1]
-        for test_dset_name, test_dset in d["data"][-1].items():
-            dset[f'test-{test_dset_name}'] = test_dset
-        raw_datasets[f'{d["lang"]}-{d["group"]}'] = dset.copy()
+    train_dsets = []
+    valid_dsets = []
+    test_dsets = {}
+    for group_dict in dataset_dict:
+        for dset_name, dset in group_dict['data'][2].items():
+            test_dsets[f"{group_dict['lang']}/{group_dict['group']}/{dset_name}"] = dset
 
+        if not (data_args.training_language == 'eng-zho' or 
+            (data_args.training_language == 'eng' and group_dict['lang'] == 'eng') or 
+            (data_args.training_language == 'zho' and group_dict['lang'] == 'zho')):
+            continue
 
-    train_dataset=raw_datasets["eng-others"]["train"]
-    eval_dataset=raw_datasets["eng-others"]["validation"]
-    input_column="audio"
-    label_list=['sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral']
-    num_labels = len(label_list)
-    pooling_mode = "mean"
+        if not (data_args.training_age_group == 'all' or
+            (data_args.training_age_group == 'elderly' and group_dict['group'] == 'elderly')
+            (data_args.training_age_group == 'others' and group_dict['group'] == 'others')):
+            continue
 
+        train_dsets.append(group_dict['data'][0])
+        valid_dsets.append(group_dict['data'][1])
 
-    # Config
-    config = AutoConfig.from_pretrained(
-        model_args.model_name_or_path,
-        num_labels=num_labels,
-        label2id={label: i for i, label in enumerate(label_list)},
-        id2label={i: label for i, label in enumerate(label_list)}
-    )
-    setattr(config, 'pooling_mode', pooling_mode)
-
-    # Model Prepare
+    train_dset = concatenate_datasets(train_dsets)
+    valid_dset = concatenate_datasets(valid_dsets)
+    test_dset_dict = DatasetDict(test_dsets)
+    
+    ###
+    # Model Initialization
+    ###
+    label_list = [
+        'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral', 'surprise', 
+        'positive', 'negative', 'excitement', 'frustrated', 'other', 'unknown'
+    ]
+    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     if 'wav2vec' in model_args.model_name_or_path:
         feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
         target_sampling_rate = feature_extractor.sampling_rate
@@ -196,81 +188,79 @@ def main():
         processor = WhisperProcessor.from_pretrained(model_args.model_name_or_path)
         model = WhisperForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
 
-# # load dummy dataset and read soundfiles
-# ds = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
-# input_features = processor(ds[0]["audio"]["array"], return_tensors="pt").input_features 
+    ###
+    # Data Preprocessor
+    ###
+    def data_transforms(batch):
+        """Apply train_transforms across a batch."""
+        output_batch = {"input_values": [], "labels": [], "labels_mask": []}
+        for audio, labels in zip(batch['audio'], batch['labels']):
+            wav = audio["array"]
+            label_array = np.array([int(label) for label in labels])
+            label_mask = label_array != -100
+            label_mask = label_mask / label_mask.sum()
+            
+            output_batch["input_values"].append(wav)
+            output_batch["labels"].append(label_array)
+            output_batch["labels_mask"].append(label_mask)
+        return output_batch
 
-# # Generate logits
-# logits = model(input_features, decoder_input_ids = torch.tensor([[50258]])).logits 
-# # take argmax and decode
-# predicted_ids = torch.argmax(logits, dim=-1)
-# transcription = processor.batch_decode(predicted_ids)
-# ['<|en|>']
-
-    def label_to_id(label, label_list):
-
-        if len(label_list) > 0:
-            return label_list.index(label) if label in label_list else -1
-
-        return label
-
-    def preprocess_function(raw_datasets):
-        speech_list = [item['array'] for item in raw_datasets[input_column]]
-        # target_list = [label_to_id(label, label_list) for label in label_list]
-
-        # # target_list = list(map(lambda x: x==1.0, raw_datasets[label_list]))
+    # Set the dataset transforms
+    train_dset.set_transform(data_transforms, output_all_columns=False)
+    valid_dset.set_transform(data_transforms, output_all_columns=False)
+    test_dset_dict.set_transform(data_transforms, output_all_columns=False)
     
-    # # print(eval_dataset['sadness'][0],
-    # # eval_dataset['fear'][0],
-    # # eval_dataset['angry'][0],
-    # # eval_dataset['happiness'][0],
-    # # eval_dataset['disgust'][0],
-    # # eval_dataset['neutral'][0])
-    # list_emo=[eval_dataset['sadness'],
-    # eval_dataset['fear'],
-    # eval_dataset['angry'],
-    # eval_dataset['happiness'],
-    # eval_dataset['disgust'],
-    # eval_dataset['neutral']]
-    # target_list=eval_dataset.index(1.0)
-
-
-        result = feature_extractor(speech_list, sampling_rate=target_sampling_rate)
-        result["labels"] = list(target_list)
-
-        return result
-
-
-
-
-    train_dataset = train_dataset.map(
-        preprocess_function,
-        batch_size=6,
-        batched=True,
-        num_proc=4
-    )   
-    eval_dataset = eval_dataset.map(
-        preprocess_function,
-        batch_size=6,
-        batched=True,
-        num_proc=4
+    ###
+    # Training Phase
+    ###
+    
+    # Initialize Trainer
+    trainer = Trainer(
+        train_dataset=train_dset,
+        eval_dataset=valid_dset,
+        model=model,
+        data_collator=data_collator,
+        args=training_args,
+        compute_metrics=compute_metrics,
+        tokenizer=feature_extractor,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=5)]        
     )
 
-    idx = 0
-    print(f"Training input_values: {train_dataset[idx]['input_values']}")
-    print(f"Training attention_mask: {train_dataset[idx]['attention_mask']}")
-    print(f"Training labels: {train_dataset[idx]['labels']} - {train_dataset[idx]['emotion']}")
-    
-    # processor = AutoProcessor.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
+    print('*** Training Phase ***')
 
-    # model = AutoModelForAudioClassification.from_pretrained("ehcalabres/wav2vec2-lg-xlsr-en-speech-emotion-recognition")
-    if not os.path.exists("{}/preprocess_data.arrow".format(model_args.cache_dir_path)):
-        vectorized_datasets.save_to_disk("{}/preprocess_data.arrow".format(model_args.cache_dir_path))
+    # use last checkpoint if exist
+    if os.path.isdir(model_args.model_name_or_path):
+        checkpoint = model_args.model_name_or_path
     else:
-        print('Loading cached dataset...')
-        vectorized_datasets = datasets.load_from_disk('{}/preprocess_data.arrow'.format(model_args.cache_dir_path))
+        checkpoint = None
 
-    train_fn(model, train_dataset, eval_dataset, feature_extractor, model_args, data_args, training_args )
+    train_result = trainer.train(resume_from_checkpoint=checkpoint)
+    trainer.save_model()
+    trainer.save_state()
+    
+    metrics = train_result.metrics
+    trainer.log_metrics("train", metrics)
+    trainer.save_metrics("train", metrics)
+    
+    ###
+    # Evaluation Phase
+    ###
+    results = {}
+    logger.info("*** Evaluation Phase ***")
+    
+    for test_dset_key, test_dset in test_dset_dict.items():
+        metrics = trainer.evaluate(eval_dataset=test_dset)
+        metrics["eval_samples"] = len(test_dset)
+        
+        keys = list(metrics.keys())
+        for key in keys:
+            metrics[key.replace('eval_',f'eval_{test_dset_key}')] = metrics[key]
+            del metrics[key]
+        metrics[f"eval_{test_dset_key}_samples"] = len(vectorized_datasets[subset])
+
+        trainer.log_metrics(f"eval_{test_dset_key}", metrics)
+        trainer.save_metrics(f"eval_{test_dset_key}", metrics)
+    
     
 if __name__ == '__main__':
     main()

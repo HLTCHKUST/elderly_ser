@@ -24,7 +24,7 @@ class DataTrainingArguments:
         metadata={"help": "The name of the dataset column containing the audio data. Defaults to 'audio'"},
     )
     label_column_name: str = field(
-        default="label", metadata={"help": "The name of the dataset column containing the labels. Defaults to 'label'"}
+        default="labels", metadata={"help": "The name of the dataset column containing the labels. Defaults to 'labels'"}
     )
     max_train_samples: Optional[int] = field(
         default=None,
@@ -48,8 +48,14 @@ class DataTrainingArguments:
         default=20,
         metadata={"help": "Audio clips will be randomly cut to this length during training if the value is set."},
     )
-    
-
+    training_language: Optional[str] = field(
+        default='eng-zho', 
+        metadata={"help": "Language used for training (eng-zho / eng / zho / yue)"}
+    )
+    training_age_group: Optional[str] = field(
+        default='all', 
+        metadata={"help": "Age group used for training (all / elderly / others)"}
+    )    
 
 @dataclass
 class ModelArguments:

@@ -236,7 +236,7 @@ def load_cmu_mosei(dataset_path):
             data_dict[label_dict[i]].append(label)
             
     cmu_mosei_df = pd.DataFrame(data_dict)
-    cmu_mosei_df['age'] = -1
+    cmu_mosei_df['age'] = -100
     return cmu_mosei_df
 
 ###
@@ -276,7 +276,7 @@ def retrieve_aggregate_datasets(dataset_path):
     # Add age group
     elderly_threshold = 60
     def get_age_group(age):
-        if age == -1:
+        if age == -100:
             return 'unknown'
         elif age >= elderly_threshold:
             return 'elderly'  
@@ -321,7 +321,7 @@ def retrieve_aggregate_datasets(dataset_path):
 
     for column in combined_df.columns:
         if column in numeric_columns:
-            combined_df[[column]] = combined_df[[column]].fillna(-1)
+            combined_df[[column]] = combined_df[[column]].fillna(-100)
         else:
             combined_df[[column]] = combined_df[[column]].fillna('unknown')
 
@@ -338,8 +338,15 @@ def df_to_dataset(df):
 # Main Function for Dataset Loading
 ###
 def load_dataset(dataset_path):
-    combined_df = retrieve_aggregate_datasets(dataset_path)
+    label_list = [
+        'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral', 'surprise', 
+        'positive', 'negative', 'excitement', 'frustrated', 'other', 'unknown'
+    ]
     
+    combined_df = retrieve_a ggregate_datasets(dataset_path)    
+    combined_df['labels'] = combined_df.apply(lambda row: [int(row[label]) for label in label_list], axis=1)
+    combined_df = combined_df[list(set(list(combined_df.columns)) - set(label_list + ['valence']))]
+
     en_others_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'others')]
     en_elderly_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'elderly')]
     zh_others_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'others')]
