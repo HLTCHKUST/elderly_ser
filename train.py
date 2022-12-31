@@ -30,6 +30,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from utils import data_loader
 from datasets import load_from_disk, set_caching_enabled
 from utils.metrics import compute_metrics
+from models.modeling_wav2vec2 import Wav2Vec2ForMultilabelSequenceClassification
 
 set_caching_enabled(True)
 
@@ -183,10 +184,11 @@ def main():
     if 'wav2vec' in model_args.model_name_or_path:
         feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
         target_sampling_rate = feature_extractor.sampling_rate
-        model = AutoModelForAudioClassification.from_pretrained(model_args.model_name_or_path).to(device)
+        model = Wav2Vec2ForMultilabelSequenceClassification.from_pretrained(model_args.model_name_or_path).to(device)
     else:
-        processor = WhisperProcessor.from_pretrained(model_args.model_name_or_path)
-        model = WhisperForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
+        raise('Not Implemented Error')
+        # processor = WhisperProcessor.from_pretrained(model_args.model_name_or_path)
+        # model = WhisperForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
 
     ###
     # Data Preprocessor
