@@ -343,7 +343,7 @@ def load_dataset(dataset_path):
         'positive', 'negative', 'excitement', 'frustrated', 'other', 'unknown'
     ]
     
-    combined_df = retrieve_a ggregate_datasets(dataset_path)    
+    combined_df = retrieve_aggregate_datasets(dataset_path)    
     combined_df['labels'] = combined_df.apply(lambda row: [int(row[label]) for label in label_list], axis=1)
     combined_df = combined_df[list(set(list(combined_df.columns)) - set(label_list + ['valence']))]
 
