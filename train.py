@@ -162,7 +162,7 @@ def main():
             continue
 
         if not (data_args.training_age_group == 'all' or
-            (data_args.training_age_group == 'elderly' and group_dict['group'] == 'elderly')
+            (data_args.training_age_group == 'elderly' and group_dict['group'] == 'elderly') or
             (data_args.training_age_group == 'others' and group_dict['group'] == 'others')):
             continue
 
@@ -180,11 +180,10 @@ def main():
         'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral', 'surprise', 
         'positive', 'negative', 'excitement', 'frustrated', 'other', 'unknown'
     ]
-    config = AutoConfig.from_pretrained(model_args.model_name_or_path)
     if 'wav2vec' in model_args.model_name_or_path:
         feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(model_args.model_name_or_path)
         target_sampling_rate = feature_extractor.sampling_rate
-        model = Wav2Vec2ForMultilabelSequenceClassification.from_pretrained(model_args.model_name_or_path).to(device)
+        model = Wav2Vec2ForMultilabelSequenceClassification.from_pretrained(model_args.model_name_or_path, num_labels=len(label_list)).to(device)
     else:
         raise('Not Implemented Error')
         # processor = WhisperProcessor.from_pretrained(model_args.model_name_or_path)
@@ -193,6 +192,10 @@ def main():
     ###
     # Data Preprocessor
     ###
+    print('TRAIN')
+    print(train_dset)
+    print('VALID')
+    print(valid_dset)
     def data_transforms(batch):
         """Apply train_transforms across a batch."""
         output_batch = {"input_values": [], "labels": [], "labels_mask": []}
@@ -208,22 +211,22 @@ def main():
         return output_batch
 
     # Set the dataset transforms
-    train_dset.set_transform(data_transforms, output_all_columns=False)
-    valid_dset.set_transform(data_transforms, output_all_columns=False)
-    test_dset_dict.set_transform(data_transforms, output_all_columns=False)
+    train_dset.set_transform(data_transforms, columns=['audio', 'labels'], output_all_columns=False)
+    valid_dset.set_transform(data_transforms, columns=['audio', 'labels'], output_all_columns=False)
+    test_dset_dict.set_transform(data_transforms, columns=['audio', 'labels'], output_all_columns=False)
     
     ###
     # Training Phase
     ###
     
     # Initialize Trainer
+    training_args.remove_unused_columns = False
     trainer = Trainer(
         train_dataset=train_dset,
         eval_dataset=valid_dset,
         model=model,
-        data_collator=data_collator,
         args=training_args,
-        compute_metrics=compute_metrics,
+        # compute_metrics=compute_metrics,
         tokenizer=feature_extractor,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=5)]        
     )
@@ -244,24 +247,25 @@ def main():
     trainer.log_metrics("train", metrics)
     trainer.save_metrics("train", metrics)
     
-    ###
-    # Evaluation Phase
-    ###
-    results = {}
-    logger.info("*** Evaluation Phase ***")
+#     ###
+#     # Evaluation Phase
+#     ###
+#     results = {}
+#     logger.info("*** Evaluation Phase ***")
     
-    for test_dset_key, test_dset in test_dset_dict.items():
-        metrics = trainer.evaluate(eval_dataset=test_dset)
-        metrics["eval_samples"] = len(test_dset)
+#     for test_dset_key, test_dset in test_dset_dict.items():
+#         trainer.compute_metrics = compute_metrics[test_dset_key]
+#         metrics = trainer.evaluate(eval_dataset=test_dset)
+#         metrics["eval_samples"] = len(test_dset)
         
-        keys = list(metrics.keys())
-        for key in keys:
-            metrics[key.replace('eval_',f'eval_{test_dset_key}')] = metrics[key]
-            del metrics[key]
-        metrics[f"eval_{test_dset_key}_samples"] = len(vectorized_datasets[subset])
+#         keys = list(metrics.keys())
+#         for key in keys:
+#             metrics[key.replace('eval_',f'eval_{test_dset_key}')] = metrics[key]
+#             del metrics[key]
+#         metrics[f"eval_{test_dset_key}_samples"] = len(vectorized_datasets[subset])
 
-        trainer.log_metrics(f"eval_{test_dset_key}", metrics)
-        trainer.save_metrics(f"eval_{test_dset_key}", metrics)
+#         trainer.log_metrics(f"eval_{test_dset_key}", metrics)
+#         trainer.save_metrics(f"eval_{test_dset_key}", metrics)
     
     
 if __name__ == '__main__':

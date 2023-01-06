@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.utils.checkpoint
 from torch import nn
-from torch.nn import BCELoss
+from torch.nn import BCEWithLogitsLoss
 
 from transformers import Wav2Vec2ForSequenceClassification
 from transformers.modeling_outputs import (
@@ -63,8 +63,8 @@ class Wav2Vec2ForMultilabelSequenceClassification(Wav2Vec2ForSequenceClassificat
 
         loss = None
         if labels is not None:
-            loss_fct = BCELoss(weight=labels_mask.view(-1))
-            loss = loss_fct(logits.view(-1), labels.view(-1))
+            loss_fct = BCEWithLogitsLoss(weight=labels_mask.view(-1))
+            loss = loss_fct(logits.view(-1), labels.float().view(-1))
 
         if not return_dict:
             output = (logits,) + outputs[_HIDDEN_STATES_START_POSITION:]

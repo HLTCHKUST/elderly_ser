@@ -19,7 +19,14 @@ def compute_metrics(p: EvalPrediction):
     preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
     preds = np.argmax(preds, axis=1)
     preds = np.array(preds).astype('int32')
+    if type(p.label_ids) == tuple:
+        p.label_ids = p.label_ids[0]
     label_ids = np.array(p.label_ids).astype('int32')
+    
+    print('preds')
+    print(preds)
+    print('p.label_ids')
+    print(p.label_ids)
 
     report = classification_report(label_ids, preds, output_dict=True)
     metrics = flatten(report)
