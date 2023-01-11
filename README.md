@@ -11,3 +11,11 @@ Emotion recogition from speech of elderly users
 - Tress -> Filename (OAF -> Old Adult Female, YAF -> Young Adult Female)
 - IEMOCAP -> meta.pkl
 - CMU_MOSEI -> meta.pkl
+
+### Dataset used
+- Crema -> Single label
+- ElderReact -> Multi label
+- ESD -> Single label
+- Chinese-Speech-Emotion-Datasets -> Single label
+- Tress -> Single label
+- IEMOCAP -> Single label
