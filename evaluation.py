@@ -6,6 +6,7 @@ import os
 import sys
 import transformers
 
+from models.modeling_wav2vec2 import Wav2Vec2ForMultilabelSequenceClassification
 from transformers import (
     AutoConfig,
     AutoFeatureExtractor,
@@ -105,26 +106,18 @@ def main():
         use_auth_token=True if model_args.use_auth_token else None,
     )
 
-    def train_transforms(batch):
-        """Apply train_transforms across a batch."""
-        output_batch = {"input_values": []}
-        for audio in batch[data_args.audio_column_name]:
-            wav = random_subsample(
-                audio["array"], max_length=data_args.max_length_seconds, sample_rate=feature_extractor.sampling_rate
-            )
-            output_batch["input_values"].append(wav)
-        output_batch["labels"] = [int(label) for label in batch[data_args.label_column_name]]
-
-        return output_batch
-
-    def val_transforms(batch):
-        """Apply val_transforms across a batch."""
-        output_batch = {"input_values": []}
-        for audio in batch[data_args.audio_column_name]:
+    def data_transforms(batch):
+        """Apply data_transforms across a batch."""
+        output_batch = {"input_values": [], "labels": [], "labels_mask": []}
+        for audio, labels in zip(batch['audio'], batch['labels']):
             wav = audio["array"]
+            label_array = np.array([int(label) for label in labels])
+            label_mask = label_array != -100
+            label_mask = label_mask / label_mask.sum()
+            
             output_batch["input_values"].append(wav)
-        output_batch["labels"] = [int(label) for label in batch[data_args.label_column_name]]
-
+            output_batch["labels"].append(label_array)
+            output_batch["labels_mask"].append(label_mask)
         return output_batch
 
     # # Prepare label mappings.
@@ -135,25 +128,18 @@ def main():
     #     label2id[label] = str(i)
     #     id2label[str(i)] = label
 
-    config = AutoConfig.from_pretrained(
-        model_args.config_name or model_args.model_name_or_path,
-        # num_labels=len(labels),
-        # label2id=label2id,
-        # id2label=id2label,
-        finetuning_task="audio-classification",
-        # cache_dir=model_args.cache_dir,
-        # revision=model_args.model_revision,
-        # use_auth_token=True if model_args.use_auth_token else None,
-    )
-    model = AutoModelForAudioClassification.from_pretrained(
-        model_args.model_name_or_path,
-        # from_tf=bool(".ckpt" in model_args.model_name_or_path),
-        config=config,
-        # cache_dir=model_args.cache_dir,
-        # revision=model_args.model_revision,
-        # use_auth_token=True if model_args.use_auth_token else None,
-        ignore_mismatched_sizes=model_args.ignore_mismatched_sizes,
-    )
+    ###
+    # Model Initialization
+    ###
+    label_list = [
+        'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral', 'surprise', 
+        'positive', 'negative', 'excitement', 'frustrated', 'other', 'unknown'
+    ]
+    if 'wav2vec' in model_args.model_name_or_path:
+        model = Wav2Vec2ForMultilabelSequenceClassification.from_pretrained(
+            model_args.model_name_or_path, num_labels=len(label_list)).to(training_args.device)
+    else:
+        raise('Not Implemented Error')
 
     # freeze the convolutional waveform encoder
     if model_args.freeze_feature_encoder:
@@ -185,7 +171,7 @@ def main():
                     preprocessed_datasets["train"].shuffle(seed=training_args.seed).select(range(data_args.max_train_samples))
                 )
             # Set the training transforms
-            preprocessed_datasets["train"].set_transform(train_transforms, output_all_columns=False)
+            preprocessed_datasets["train"].set_transform(data_transforms, output_all_columns=False)
 
         if training_args.do_eval:
             if data_args.max_eval_samples is not None:
@@ -193,9 +179,10 @@ def main():
                     preprocessed_datasets["validation"].shuffle(seed=training_args.seed).select(range(data_args.max_eval_samples))
                 )
             # Set the validation transforms
-            preprocessed_datasets["validation"].set_transform(val_transforms, output_all_columns=False)
+            preprocessed_datasets["validation"].set_transform(data_transforms, output_all_columns=False)
 
         # Initialize our trainer
+        training_args.remove_unused_columns = False
         trainer = Trainer(
             model=model,
             args=training_args,
