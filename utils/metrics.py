@@ -16,19 +16,26 @@ def flatten(d, parent_key='', sep='_'):
     return dict(items)
 
 def compute_metrics(p: EvalPrediction):
-    preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-    preds = np.argmax(preds, axis=1)
-    preds = np.array(preds).astype('int32')
-    if type(p.label_ids) == tuple:
-        p.label_ids = p.label_ids[0]
-    label_ids = np.array(p.label_ids).astype('int32')
-    
-    print('preds')
-    print(preds)
-    print('p.label_ids')
-    print(p.label_ids)
+    label_ids = p.label_ids[0] if isinstance(p.label_ids, tuple) else p.label_ids
+    label_ids = np.array(label_ids).astype('int32')
 
-    report = classification_report(label_ids, preds, output_dict=True)
+    ignore_columns = np.where(label_ids[0] == -100)[0]
+    target_ids = np.where(label_ids[0] != -100)[0]
+
+    target_names = [f'class_{target_id}' for target_id in target_ids]
+    label_ids = np.delete(label_ids, ignore_columns, axis=1)
+    label_ids = np.argmax(label_ids, axis=1)
+
+    preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
+    preds = np.delete(np.array(preds), ignore_columns, axis=1)
+    preds = np.argmax(preds, axis=1)
+    
+    # print('preds')
+    # print(preds.shape, preds)
+    # print('p.label_ids')
+    # print(label_ids.shape, label_ids)
+
+    report = classification_report(label_ids, preds, output_dict=True, labels=range(len(target_ids)), target_names=target_names)
     metrics = flatten(report)
 
     return metrics

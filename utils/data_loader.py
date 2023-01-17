@@ -314,7 +314,7 @@ def retrieve_aggregate_datasets(dataset_path):
     
     # Preprocess empty value
     numeric_columns = [
-        'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral',  
+        'sadness', 'fear', 'angry', 'disgust', 'neutral',  
         'happiness', 'surprise', 'valence', 'positive', 'negative',
         'excitement', 'frustrated', 'other', 'unknown', 'age'
     ]

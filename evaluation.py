@@ -96,8 +96,6 @@ def main():
             dset[f'test-{test_dset_name}'] = test_dset
         raw_datasets[f'{d["lang"]}-{d["group"]}'] = dset.copy()
 
-    print(raw_datasets)
-
     feature_extractor = AutoFeatureExtractor.from_pretrained(
         model_args.feature_extractor_name or model_args.model_name_or_path,
         return_attention_mask=model_args.attention_mask,
@@ -145,7 +143,15 @@ def main():
     if model_args.freeze_feature_encoder:
         model.freeze_feature_encoder()
 
-    def evaluate_subset(raw_datasets, subset):
+    def evaluate_subset(raw_datasets, subset, eval_split="test"):
+
+        if eval_split == "validation":
+            split_names = [eval_split]
+        elif eval_split == "test":
+            split_names = [k for k in raw_datasets[subset].keys() if eval_split in k]
+        else:
+            return NotImplementedError("Split name has to be either: `train`, `validation`, or `test`.")
+
         preprocessed_datasets = raw_datasets[subset].copy()
 
         if data_args.audio_column_name not in preprocessed_datasets["train"].column_names:
@@ -175,11 +181,13 @@ def main():
 
         if training_args.do_eval:
             if data_args.max_eval_samples is not None:
-                preprocessed_datasets["validation"] = (
-                    preprocessed_datasets["validation"].shuffle(seed=training_args.seed).select(range(data_args.max_eval_samples))
-                )
+                for split in split_names:
+                    preprocessed_datasets[split] = (
+                        preprocessed_datasets[split].shuffle(seed=training_args.seed).select(range(data_args.max_eval_samples))
+                    )
             # Set the validation transforms
-            preprocessed_datasets["validation"].set_transform(data_transforms, output_all_columns=False)
+            for split in split_names:
+                preprocessed_datasets[split].set_transform(data_transforms, output_all_columns=False)
 
         # Initialize our trainer
         training_args.remove_unused_columns = False
@@ -201,29 +209,25 @@ def main():
                 checkpoint = last_checkpoint
             train_result = trainer.train(resume_from_checkpoint=checkpoint)
             trainer.save_model()
-            trainer.log_metrics("train", train_result.metrics)
-            trainer.save_metrics("train", train_result.metrics)
+            trainer.log_metrics(f'train_{subset}', train_result.metrics)
+            trainer.save_metrics(f'train_{subset}', train_result.metrics)
             trainer.save_state()
 
         # Evaluation
         if training_args.do_eval:
-            print(preprocessed_datasets)
-            print()
-            print(preprocessed_datasets["validation"])
-            print()
-            print(preprocessed_datasets["validation"][0])
-            print()
-            metrics = trainer.evaluate()
+            metrics_for_all_tasks = {}
+            for split in split_names:
+                metrics = trainer.evaluate(
+                    eval_dataset=preprocessed_datasets[split], metric_key_prefix=f'eval_{subset}_{split}')
+                metrics_for_all_tasks.update(metrics)
             print(f"=== Validation {subset} ===")
-            trainer.log_metrics("validation", metrics)
-            trainer.save_metrics("validation", metrics)
+            trainer.log_metrics(f'{eval_split}_{subset}', metrics_for_all_tasks)
+            trainer.save_metrics(f'{eval_split}_{subset}', metrics_for_all_tasks)
 
-        print()
-
-    # evaluate_subset(raw_datasets, subset="eng-others")
+    evaluate_subset(raw_datasets, subset="eng-others")
     # evaluate_subset(raw_datasets, subset="eng-elderly")
     # evaluate_subset(raw_datasets, subset="zho-others")
-    evaluate_subset(raw_datasets, subset="zho-elderly")
+    # evaluate_subset(raw_datasets, subset="zho-elderly")
 
 if __name__ == "__main__":
     main()
