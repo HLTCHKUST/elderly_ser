@@ -59,8 +59,8 @@ def load_elder_react(dataset_path):
     elder_test_df['lang'] = 'english'
 
     elder_train_df['audio'] = elder_train_df['audio'].apply(lambda x: f'{dataset_path}/ElderReact/ElderReact_train/{x}'.replace('.mp4','.wav'))
-    elder_valid_df['audio'] = elder_valid_df['audio'].apply(lambda x: f'{dataset_path}/ElderReact/ElderReact_train/{x}'.replace('.mp4','.wav'))
-    elder_test_df['audio'] = elder_test_df['audio'].apply(lambda x: f'{dataset_path}/ElderReact/ElderReact_train/{x}'.replace('.mp4','.wav'))
+    elder_valid_df['audio'] = elder_valid_df['audio'].apply(lambda x: f'{dataset_path}/ElderReact/ElderReact_dev/{x}'.replace('.mp4','.wav'))
+    elder_test_df['audio'] = elder_test_df['audio'].apply(lambda x: f'{dataset_path}/ElderReact/ElderReact_test/{x}'.replace('.mp4','.wav'))
 
     elder_train_df['gender'] = elder_train_df['gender'].apply(lambda x: 'male' if x == 'm' else 'female')
     elder_valid_df['gender'] = elder_valid_df['gender'].apply(lambda x: 'male' if x == 'm' else 'female')
