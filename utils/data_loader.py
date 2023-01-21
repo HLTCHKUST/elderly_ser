@@ -353,7 +353,7 @@ def load_dataset(dataset_path):
     zh_elderly_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'elderly')]
     
     trn_en_others_df = en_others_df.loc[en_others_df['split'] == 'train']
-    val_en_others_df = en_others_df.loc[en_others_df['split'] == 'valid']
+    val_en_others_df = en_others_df.loc[en_others_df['split'].isin(['valid', 'evaluation'])]
     tst_en_others_df = en_others_df.loc[en_others_df['split'] == 'test']
     
     trn_en_elderly_df = en_elderly_df.loc[en_elderly_df['split'] == 'train']
@@ -361,7 +361,7 @@ def load_dataset(dataset_path):
     tst_en_elderly_df = en_elderly_df.loc[en_elderly_df['split'] == 'test']
     
     trn_zh_others_df = zh_others_df.loc[zh_others_df['split'] == 'train']
-    val_zh_others_df = zh_others_df.loc[zh_others_df['split'] == 'valid']
+    val_zh_others_df = zh_others_df.loc[zh_others_df['split'].isin(['valid', 'evaluation'])]
     tst_zh_others_df = zh_others_df.loc[zh_others_df['split'] == 'test']
     
     trn_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'train']
