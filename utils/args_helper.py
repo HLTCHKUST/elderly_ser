@@ -55,6 +55,14 @@ class DataTrainingArguments:
     training_age_group: Optional[str] = field(
         default='all', 
         metadata={"help": "Age group used for training (all / elderly / others)"}
+    )  
+    validation_language: Optional[str] = field(
+        default='eng-zho', 
+        metadata={"help": "Language used for validation (eng-zho / eng / zho / yue)"}
+    )
+    validation_age_group: Optional[str] = field(
+        default='all', 
+        metadata={"help": "Age group used for training (all / elderly / others)"}
     )    
 
 @dataclass

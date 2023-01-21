@@ -3,6 +3,7 @@ import evaluate
 import logging
 import numpy as np
 import os
+import pickle
 import sys
 import transformers
 
@@ -216,18 +217,43 @@ def main():
         # Evaluation
         if training_args.do_eval:
             metrics_for_all_tasks = {}
+            pred_dir_path = os.path.join(training_args.output_dir, 'pred')
+            if not os.path.exists(pred_dir_path):
+                os.makedirs(pred_dir_path)
             for split in split_names:
-                metrics = trainer.evaluate(
-                    eval_dataset=preprocessed_datasets[split], metric_key_prefix=f'eval_{subset}_{split}')
+                predictions, label_ids, metrics = trainer.predict(
+                    test_dataset=preprocessed_datasets[split], metric_key_prefix=f'eval_{subset}_{split}')
+                with open(os.path.join(pred_dir_path, f'{subset}_{split}.pkl'), 'wb') as f:
+                    pickle.dump({
+                        "predictions": predictions,
+                        "label_ids": label_ids,
+                    }, f)
                 metrics_for_all_tasks.update(metrics)
             print(f"=== Validation {subset} ===")
             trainer.log_metrics(f'{eval_split}_{subset}', metrics_for_all_tasks)
             trainer.save_metrics(f'{eval_split}_{subset}', metrics_for_all_tasks)
 
-    evaluate_subset(raw_datasets, subset="eng-others")
-    # evaluate_subset(raw_datasets, subset="eng-elderly")
-    # evaluate_subset(raw_datasets, subset="zho-others")
-    # evaluate_subset(raw_datasets, subset="zho-elderly")
+
+    lang_subset = []
+    if "zho" in data_args.validation_language:
+        lang_subset.append("zho")
+    if "eng" in data_args.validation_language:
+        lang_subset.append("eng")
+    if "yue" in data_args.validation_language:
+        lang_subset.append("yue")
+    
+    age_group_subset = []
+    if data_args.validation_age_group == "all":
+        age_group_subset.append("elderly")
+        age_group_subset.append("others")
+    elif data_args.validation_age_group == "elderly":
+        age_group_subset.append("elderly")
+    elif data_args.validation_age_group == "others":
+        age_group_subset.append("others")
+    
+    for lang in lang_subset:
+        for age_group in age_group_subset:
+            evaluate_subset(raw_datasets, subset=f'{lang}-{age_group}')
 
 if __name__ == "__main__":
     main()
