@@ -6,6 +6,7 @@ import datasets
 import json
 import pickle
 from sklearn.model_selection import train_test_split
+from yuemotion import YuemotionDataset
 
 ###
 # Load Crema
@@ -238,6 +239,54 @@ def load_cmu_mosei(dataset_path):
     cmu_mosei_df = pd.DataFrame(data_dict)
     cmu_mosei_df['age'] = -100
     return cmu_mosei_df
+
+
+def load_yuemotion(dataset_path):
+    label_dict = {"1": "angry",
+                  "2": "happiness",
+                  "3": "sadness",
+                  "4": "neutral",
+                  "5": "fear",
+                  "6": "disgust"}
+    data_dict = {"audio": [],
+                 "age": [],
+                 "gender": [],
+                 "lang": [],
+                 "split":[],
+                 "sentence_id": [],
+                 "subject_id": []}
+    data_dict.update({emotion: [] for emotion in label_dict.values()})
+    #If no split, use split=all and delete the split from dict
+    #yuemotion_all = YuemotionDataset(dataset_path, split="all")
+    yuemotion_train =  YuemotionDataset(dataset_path, split="train")
+    yuemotion_test = YuemotionDataset(dataset_path, split="test")
+    yuemotion_val = YuemotionDataset(dataset_path, split="val")
+    dataset_splits = {"train": yuemotion_train,
+              "test": yuemotion_test,
+              "val": yuemotion_val}
+
+    for split in dataset_splits:
+        dataset = dataset_splits[split]
+        for sample in dataset:
+            data_dict["age"].append(sample["metadata"]["age"])
+            data_dict["gender"].append(sample["metadata"]["gender"])
+            data_dict["audio"].append(sample["metadata"]["audio_path"])
+            data_dict["sentence_id"].append(sample["metadata"]["sentence_id"])
+            data_dict["subject_id"].append(sample["metadata"]["subject_id"])
+            data_dict["split"].append(split)
+            data_dict["lang"].append("yue")
+
+            label = sample["label"]
+            for emotion in label_dict.values():
+                if emotion == label_dict[str(label)]:
+                    data_dict[emotion].append(1)
+                else:
+                    data_dict[emotion].append(0)
+
+    yuemotion_df = pd.DataFrame(data_dict)
+    return yuemotion_df
+
+
 
 ###
 # Split dataset into train, valid, & test
