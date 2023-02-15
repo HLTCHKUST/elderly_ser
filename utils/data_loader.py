@@ -252,6 +252,7 @@ def load_yuemotion(dataset_path):
                  "age": [],
                  "gender": [],
                  "lang": [],
+                 "age_group": [],
                  "split":[],
                  "sentence_id": [],
                  "subject_id": []}
@@ -262,8 +263,8 @@ def load_yuemotion(dataset_path):
     yuemotion_test = YuemotionDataset(dataset_path, split="test")
     yuemotion_val = YuemotionDataset(dataset_path, split="val")
     dataset_splits = {"train": yuemotion_train,
-              "test": yuemotion_test,
-              "val": yuemotion_val}
+                      "test": yuemotion_test,
+                      "val": yuemotion_val}
 
     for split in dataset_splits:
         dataset = dataset_splits[split]
@@ -271,10 +272,15 @@ def load_yuemotion(dataset_path):
             data_dict["age"].append(sample["metadata"]["age"])
             data_dict["gender"].append(sample["metadata"]["gender"])
             data_dict["audio"].append(sample["metadata"]["audio_path"])
+            if sample["metadata"]["elderly_or_not"] == "elderly":
+                data_dict["age_group"].append("elderly")
+            else:
+                data_dict["age_group"].append("others")
             data_dict["sentence_id"].append(sample["metadata"]["sentence_id"])
             data_dict["subject_id"].append(sample["metadata"]["subject_id"])
             data_dict["split"].append(split)
             data_dict["lang"].append("yue")
+            
 
             label = sample["label"]
             for emotion in label_dict.values():
@@ -396,10 +402,15 @@ def load_dataset(dataset_path):
     combined_df['labels'] = combined_df.apply(lambda row: [int(row[label]) for label in label_list], axis=1)
     combined_df = combined_df[list(set(list(combined_df.columns)) - set(label_list + ['valence']))]
 
+    yuemotion_df = load_yuemotion(dataset_path)
+
+    ##TO DO
     en_others_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'others')]
     en_elderly_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'elderly')]
     zh_others_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'others')]
     zh_elderly_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'elderly')]
+    yue_others_df = yuemotion_df.loc[(yuemotion_df['lang'] == 'yue') & (yuemotion_df['age_group'] == 'others')]
+    yue_elderly_df = yuemotion_df.loc[(yuemotion_df['lang'] == 'yue') & (yuemotion_df['age_group'] == 'elderly')]
     
     trn_en_others_df = en_others_df.loc[en_others_df['split'] == 'train']
     val_en_others_df = en_others_df.loc[en_others_df['split'].isin(['valid', 'evaluation'])]
@@ -417,6 +428,14 @@ def load_dataset(dataset_path):
     val_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'valid']
     tst_zh_elderly_df = zh_elderly_df.loc[zh_elderly_df['split'] == 'test']
     
+    trn_yue_others_df = yue_others_df.loc[yue_others_df['split'] == 'train']
+    val_yue_others_df = yue_others_df.loc[yue_others_df['split'] == 'val']
+    tst_yue_others_df = yue_others_df.loc[yue_others_df['split'] == 'test']
+    
+    trn_yue_elderly_df = yue_elderly_df.loc[yue_elderly_df['split'] == 'train']
+    val_yue_elderly_df = yue_elderly_df.loc[yue_elderly_df['split'] == 'val']
+    tst_yue_elderly_df = yue_elderly_df.loc[yue_elderly_df['split'] == 'test']
+
     return [
         {
             "lang": "eng",
@@ -449,6 +468,22 @@ def load_dataset(dataset_path):
                 df_to_dataset(trn_zh_elderly_df),
                 df_to_dataset(val_zh_elderly_df),
                 {dset: df_to_dataset(df) for dset, df in tst_zh_elderly_df.groupby('dataset')}
+            )
+        }, {
+            "lang": "yue",
+            "group": "others",
+            "data": (
+                df_to_dataset(trn_yue_others_df),
+                df_to_dataset(val_yue_others_df),
+                {dset: df_to_dataset(df) for dset, df in tst_yue_others_df.groupby('dataset')}
+            )
+        }, {
+            "lang": "yue",
+            "group": "elderly",
+            "data": (
+                df_to_dataset(trn_yue_elderly_df),
+                df_to_dataset(val_yue_elderly_df),
+                {dset: df_to_dataset(df) for dset, df in tst_yue_elderly_df.groupby('dataset')}
             )
         },
     ]
