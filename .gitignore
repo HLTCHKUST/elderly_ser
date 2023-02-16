@@ -175,3 +175,4 @@ poetry.toml
 **/data
 **/datasets/
 **/__pycache__
+**/save/

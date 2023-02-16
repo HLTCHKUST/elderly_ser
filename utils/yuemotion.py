@@ -6,7 +6,7 @@ import torch
 import torchaudio
 import torchaudio.functional as F
 import torchaudio.transforms as T
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -51,22 +51,22 @@ class YuemotionDataset(Dataset):
         filename, extension = os.path.splitext(file)
         filename_data = filename.split("_")
 
-        metadata = {"subject_id":filename_data[0],
+        metadata = {"subject_id": filename_data[0],
                     "gender":("female" if filename_data[1][0]=="f" else "male"),
-                    "age":filename_data[1][1:],
+                    "age": int(filename_data[1][1:]),
                     "elderly_or_not":("elderly" if int(filename_data[1][1:]) >= 59 else "non_elderly"),
                     "sentence_id":filename_data[2],
                     "format":extension}
 
         audio_path = os.path.join(self.data_dir, metadata["gender"], metadata["elderly_or_not"], file)
 
-        audio, sample_rate = torchaudio.load(audio_path)
-        label = filename_data[3]
-        if self.transform:
-            audio = self.transform(audio)
+        # audio, sample_rate = torchaudio.load(audio_path)
+        label = int(filename_data[3])
+        # if self.transform:
+        #     audio = self.transform(audio)
 
-        metadata["sample_rate"] = sample_rate
-        return {"audio":audio, "label":label, "metadata":metadata}
+        metadata["sample_rate"] = 16000
+        return {"audio_path": audio_path, "label": label, "metadata":metadata}
 
 
 
@@ -91,8 +91,6 @@ class YuemotionDataset(Dataset):
             val_files.extend(cur_val.tolist())
 
         return train_files, test_files, val_files
-
-
 
     def _build_data_folders(self, data_dir):
 
@@ -163,27 +161,27 @@ class YuemotionDataset(Dataset):
 
 
 
-    def plot_waveform(self, idx):
+    # def plot_waveform(self, idx):
 
-        data = self.__getitem__(idx)
-        waveform = data["audio"]
-        sample_rate = data["metadata"]["sample_rate"]
+    #     data = self.__getitem__(idx)
+    #     waveform = data["audio"]
+    #     sample_rate = data["metadata"]["sample_rate"]
         
-        waveform = waveform.numpy()
+    #     waveform = waveform.numpy()
 
-        num_channels, num_frames = waveform.shape
-        time_axis = torch.arange(0, num_frames) / sample_rate
+    #     num_channels, num_frames = waveform.shape
+    #     time_axis = torch.arange(0, num_frames) / sample_rate
 
-        figure, axes = plt.subplots(num_channels, 1)
-        if num_channels == 1:
-            axes = [axes]
-        for c in range(num_channels):
-            axes[c].plot(time_axis, waveform[c], linewidth=1)
-            axes[c].grid(True)
-            if num_channels > 1:
-                axes[c].set_ylabel(f"Channel {c+1}")
-        figure.suptitle("waveform")
-        plt.show(block=False)
+    #     figure, axes = plt.subplots(num_channels, 1)
+    #     if num_channels == 1:
+    #         axes = [axes]
+    #     for c in range(num_channels):
+    #         axes[c].plot(time_axis, waveform[c], linewidth=1)
+    #         axes[c].grid(True)
+    #         if num_channels > 1:
+    #             axes[c].set_ylabel(f"Channel {c+1}")
+    #     figure.suptitle("waveform")
+    #     plt.show(block=False)
 
 
 

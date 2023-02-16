@@ -147,7 +147,9 @@ def main():
     #     },
     # ]
 
+    print('Loading dataset...')
     dataset_dict = data_loader.load_dataset(data_args.dataset_path)
+    # print(dataset_dict)
     
     train_dsets = []
     valid_dsets = []
@@ -156,9 +158,11 @@ def main():
         for dset_name, dset in group_dict['data'][2].items():
             test_dsets[f"{group_dict['lang']}/{group_dict['group']}/{dset_name}"] = dset
 
-        if not (data_args.training_language == 'eng-zho' or 
+        if not (data_args.training_language == 'eng-zho-yue' or
+            (data_args.training_language == 'eng-zho' and (group_dict['lang'] == 'eng' or group_dict['lang'] == 'zho')) or 
             (data_args.training_language == 'eng' and group_dict['lang'] == 'eng') or 
-            (data_args.training_language == 'zho' and group_dict['lang'] == 'zho')):
+            (data_args.training_language == 'zho' and group_dict['lang'] == 'zho') or
+            (data_args.training_language == 'yue' and group_dict['lang'] == 'yue')):
             continue
 
         if not (data_args.training_age_group == 'all' or
@@ -192,10 +196,13 @@ def main():
     ###
     # Data Preprocessor
     ###
-    print('TRAIN')
-    print(train_dset)
-    print('VALID')
-    print(valid_dset)
+    # print('TRAIN')
+    # print(train_dset)
+    # print('VALID')
+    # print(valid_dset)
+    # print('TEST')
+    # print(test_dset_dict)
+    
     def data_transforms(batch):
         """Apply train_transforms across a batch."""
         output_batch = {"input_values": [], "labels": [], "labels_mask": []}

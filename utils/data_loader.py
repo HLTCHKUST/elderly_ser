@@ -6,7 +6,7 @@ import datasets
 import json
 import pickle
 from sklearn.model_selection import train_test_split
-from yuemotion import YuemotionDataset
+from .yuemotion import YuemotionDataset
 
 ###
 # Load Crema
@@ -248,20 +248,22 @@ def load_yuemotion(dataset_path):
                   "4": "neutral",
                   "5": "fear",
                   "6": "disgust"}
-    data_dict = {"audio": [],
-                 "age": [],
-                 "gender": [],
-                 "lang": [],
-                 "age_group": [],
-                 "split":[],
-                 "sentence_id": [],
-                 "subject_id": []}
+    data_dict = {
+        "audio": [],
+        "age": [],
+        "gender": [],
+        "lang": [],
+        "age_group": [],
+        "split":[],
+        # "sentence_id": [],
+        # "subject_id": [],
+    }
     data_dict.update({emotion: [] for emotion in label_dict.values()})
     #If no split, use split=all and delete the split from dict
     #yuemotion_all = YuemotionDataset(dataset_path, split="all")
-    yuemotion_train =  YuemotionDataset(dataset_path, split="train")
-    yuemotion_test = YuemotionDataset(dataset_path, split="test")
-    yuemotion_val = YuemotionDataset(dataset_path, split="val")
+    yuemotion_train =  YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="train")
+    yuemotion_test = YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="test")
+    yuemotion_val = YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="val")
     dataset_splits = {"train": yuemotion_train,
                       "test": yuemotion_test,
                       "val": yuemotion_val}
@@ -271,13 +273,13 @@ def load_yuemotion(dataset_path):
         for sample in dataset:
             data_dict["age"].append(sample["metadata"]["age"])
             data_dict["gender"].append(sample["metadata"]["gender"])
-            data_dict["audio"].append(sample["metadata"]["audio_path"])
+            data_dict["audio"].append(sample["audio_path"])
             if sample["metadata"]["elderly_or_not"] == "elderly":
                 data_dict["age_group"].append("elderly")
             else:
                 data_dict["age_group"].append("others")
-            data_dict["sentence_id"].append(sample["metadata"]["sentence_id"])
-            data_dict["subject_id"].append(sample["metadata"]["subject_id"])
+            # data_dict["sentence_id"].append(sample["metadata"]["sentence_id"])
+            # data_dict["subject_id"].append(sample["metadata"]["subject_id"])
             data_dict["split"].append(split)
             data_dict["lang"].append("yue")
             
@@ -318,6 +320,7 @@ def retrieve_aggregate_datasets(dataset_path):
     tess_df = load_tess(dataset_path)
     iemocap_df = load_iemocap(dataset_path)
     cmu_mosei_df = load_cmu_mosei(dataset_path)
+    yuemotion_df = load_yuemotion(dataset_path)
     
     # Add dataset meta
     crema_df['dataset'] = 'crema'
@@ -327,6 +330,7 @@ def retrieve_aggregate_datasets(dataset_path):
     tess_df['dataset'] = 'tess'
     iemocap_df['dataset'] = 'iemocap'
     cmu_mosei_df['dataset'] = 'cmu_mosei'
+    yuemotion_df['dataset'] = 'yuemotion'
 
     # Add age group
     elderly_threshold = 60
@@ -351,6 +355,8 @@ def retrieve_aggregate_datasets(dataset_path):
     crema_others_df = crema_df[crema_df['age_group'] == 'others']
     tess_elderly_df = tess_df[tess_df['age_group'] == 'elderly']
     tess_others_df = tess_df[tess_df['age_group'] == 'others']
+    yuemotion_elderly_df = yuemotion_df[yuemotion_df['age_group'] == 'elderly']
+    yuemotion_others_df = yuemotion_df[yuemotion_df['age_group'] == 'others']
     
     # Assign Split
     csed_df = assign_dataset_split(csed_df, val_size=52, test_size=400)
@@ -364,7 +370,8 @@ def retrieve_aggregate_datasets(dataset_path):
     # Combined DataFrame
     combined_df = pd.concat([
         crema_others_df, crema_elderly_df, elder_df, esd_df, csed_df, 
-        tess_others_df, tess_elderly_df, iemocap_df, cmu_mosei_df
+        tess_others_df, tess_elderly_df, iemocap_df, cmu_mosei_df,
+        yuemotion_elderly_df, yuemotion_others_df,
     ])
     
     # Preprocess empty value
@@ -402,15 +409,13 @@ def load_dataset(dataset_path):
     combined_df['labels'] = combined_df.apply(lambda row: [int(row[label]) for label in label_list], axis=1)
     combined_df = combined_df[list(set(list(combined_df.columns)) - set(label_list + ['valence']))]
 
-    yuemotion_df = load_yuemotion(dataset_path)
-
     ##TO DO
     en_others_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'others')]
     en_elderly_df = combined_df.loc[(combined_df['lang'] == 'english') & (combined_df['age_group'] == 'elderly')]
     zh_others_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'others')]
     zh_elderly_df = combined_df.loc[(combined_df['lang'] == 'chinese') & (combined_df['age_group'] == 'elderly')]
-    yue_others_df = yuemotion_df.loc[(yuemotion_df['lang'] == 'yue') & (yuemotion_df['age_group'] == 'others')]
-    yue_elderly_df = yuemotion_df.loc[(yuemotion_df['lang'] == 'yue') & (yuemotion_df['age_group'] == 'elderly')]
+    yue_others_df = combined_df.loc[(combined_df['lang'] == 'yue') & (combined_df['age_group'] == 'others')]
+    yue_elderly_df = combined_df.loc[(combined_df['lang'] == 'yue') & (combined_df['age_group'] == 'elderly')]
     
     trn_en_others_df = en_others_df.loc[en_others_df['split'] == 'train']
     val_en_others_df = en_others_df.loc[en_others_df['split'].isin(['valid', 'evaluation'])]
