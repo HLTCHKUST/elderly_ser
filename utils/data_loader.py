@@ -241,7 +241,7 @@ def load_cmu_mosei(dataset_path):
     return cmu_mosei_df
 
 
-def load_yuemotion(dataset_path):
+def load_yuemotion(dataset_path, mix_speakers=True, seed=0):
     label_dict = {"1": "angry",
                   "2": "happiness",
                   "3": "sadness",
@@ -259,11 +259,11 @@ def load_yuemotion(dataset_path):
         # "subject_id": [],
     }
     data_dict.update({emotion: [] for emotion in label_dict.values()})
-    #If no split, use split=all and delete the split from dict
+    #If no split, use split=all
     #yuemotion_all = YuemotionDataset(dataset_path, split="all")
-    yuemotion_train =  YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="train")
-    yuemotion_test = YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="test")
-    yuemotion_val = YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="val")
+    yuemotion_train =  YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="train", mix_speakers=mix_speakers, seed=seed)
+    yuemotion_test = YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="test", mix_speakers=mix_speakers, seed=seed)
+    yuemotion_val = YuemotionDataset(os.path.join(dataset_path, "Yuemotion"), split="val", mix_speakers=mix_speakers, seed=seed)
     dataset_splits = {"train": yuemotion_train,
                       "test": yuemotion_test,
                       "val": yuemotion_val}

@@ -12,11 +12,13 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from IPython.display import Audio, display
 
+from sklearn.model_selection import train_test_split
+
 
 
 
 class YuemotionDataset(Dataset):
-    def __init__(self, data_dir, split="train", transform=None):
+    def __init__(self, data_dir, split="train", transform=None, mix_speakers=True, seed=0):
         """
         data_dir is the path to the folder with all the preprocessed .wav data
         """
@@ -24,10 +26,13 @@ class YuemotionDataset(Dataset):
         if split not in ["train", "test", "val"]:
             raise ValueError("split should be either train, test or val")
 
+        self.mix_speakers = mix_speakers
+        self.seed = seed
         #Build the data folders and sort the preprocessed data into male/female/elderly/non_elderly folders
         self.file_paths = self._build_data_folders(data_dir)
         print(f"Processing the {split} split...")
-        train_files, test_files, val_files = self._balanced_split(self.file_paths, split_ratio=[0.5, 0.15, 0.35])
+        train_files, test_files, val_files = self._balanced_split(self.file_paths, self.mix_speakers, self.seed, split_ratio=[0.5, 0.15, 0.35])
+
         
         #Split
         if split == "train":
@@ -70,8 +75,9 @@ class YuemotionDataset(Dataset):
 
 
 
-    def _balanced_split(self, file_paths, split_ratio=[0.5, 0.15, 0.35]):
+    def _balanced_split(self, file_paths, mix_speakers, seed, split_ratio=[0.5, 0.15, 0.35]):
         """
+        mix_speakers set to True to have mixed speakers in each split instead of the same ones
         split ratio default is train/val/test 0.5/0.15/0.35
         """
 
@@ -85,7 +91,18 @@ class YuemotionDataset(Dataset):
 
         for key in file_paths.keys():
             cur_files = os.listdir(file_paths[key])
-            cur_train, cur_val, cur_test = np.split(cur_files, [int(len(cur_files)*train_ratio), int(len(cur_files)*(train_ratio+val_ratio))])
+            if mix_speakers:
+                train_ratio = split_ratio[0]
+                #val_ratio = split_ratio[1]/(1-test_ratio)
+                test_ratio = split_ratio[2]/(1-train_ratio)
+
+                data_for_split = np.array([(file, file.split(".")[0][-1]) for file in cur_files])
+                cur_train, rest = train_test_split(data_for_split, test_size=split_ratio[0], random_state=seed, stratify=data_for_split[:, 1])
+                cur_val, cur_test = train_test_split(rest, test_size=test_ratio, random_state=seed, stratify=rest[:, 1])
+                
+                cur_train, cur_val, cur_test = cur_train[:, 0], cur_val[:, 0], cur_test[:, 0]
+            else:
+                cur_train, cur_val, cur_test = np.split(cur_files, [int(len(cur_files)*train_ratio), int(len(cur_files)*(train_ratio+val_ratio))])
             train_files.extend(cur_train.tolist())
             test_files.extend(cur_test.tolist())
             val_files.extend(cur_val.tolist())
@@ -205,9 +222,6 @@ class YuemotionDataset(Dataset):
 
 
 def collate_fn(batch):
-    ##Need to make the masks for the padding, or not?
-    #If yes, add the masks
-    ## TO DO ##
 
     audios = [torch.squeeze(sample["audio"], dim=0) for sample in batch]
     labels = [int(sample["label"]) for sample in batch]
@@ -217,9 +231,7 @@ def collate_fn(batch):
     return torch.from_numpy(audios), torch.tensor(labels)
 
 def transform(audio):
-    ##If needed TO-DO
-    ##Are those the usually used transformation in speech? https://pytorch.org/audio/stable/transforms.html
-    ##FrequencyMasking, TimeMasking and TimeStretch?
+    ##FrequencyMasking, TimeMasking and TimeStretch if needed
     return audio
 
 
