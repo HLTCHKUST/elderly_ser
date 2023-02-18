@@ -241,7 +241,7 @@ def load_cmu_mosei(dataset_path):
     return cmu_mosei_df
 
 
-def load_yuemotion(dataset_path, mix_speakers=True, seed=0):
+def load_yuemotion(dataset_path, mix_speakers, seed=0):
     label_dict = {"1": "angry",
                   "2": "happiness",
                   "3": "sadness",
@@ -311,7 +311,7 @@ def assign_dataset_split(df, val_size, test_size, stratify_col='gender', seed=0)
 ###
 # Function to retrieve and aggregate datasets
 ###
-def retrieve_aggregate_datasets(dataset_path):
+def retrieve_aggregate_datasets(dataset_path, mix_speakers):
     # Load datasets
     crema_df = load_crema(dataset_path)
     elder_df = load_elder_react(dataset_path)
@@ -320,7 +320,7 @@ def retrieve_aggregate_datasets(dataset_path):
     tess_df = load_tess(dataset_path)
     iemocap_df = load_iemocap(dataset_path)
     cmu_mosei_df = load_cmu_mosei(dataset_path)
-    yuemotion_df = load_yuemotion(dataset_path)
+    yuemotion_df = load_yuemotion(dataset_path, mix_speakers=mix_speakers)
     
     # Add dataset meta
     crema_df['dataset'] = 'crema'
@@ -366,7 +366,7 @@ def retrieve_aggregate_datasets(dataset_path):
     tess_others_df = assign_dataset_split(tess_others_df, val_size=201, test_size=500)
     iemocap_df = assign_dataset_split(iemocap_df, val_size=1039, test_size=1500)
     cmu_mosei_df = assign_dataset_split(cmu_mosei_df, val_size=1259, test_size=2000, stratify_col='age_group')
-
+    
     # Combined DataFrame
     combined_df = pd.concat([
         crema_others_df, crema_elderly_df, elder_df, esd_df, csed_df, 
@@ -399,13 +399,13 @@ def df_to_dataset(df):
 ###
 # Main Function for Dataset Loading
 ###
-def load_dataset(dataset_path):
+def load_dataset(dataset_path, mix_speakers=True):
     label_list = [
         'sadness', 'fear', 'angry', 'happiness', 'disgust', 'neutral', 'surprise', 
         'positive', 'negative', 'excitement', 'frustrated', 'other', 'unknown'
     ]
     
-    combined_df = retrieve_aggregate_datasets(dataset_path)    
+    combined_df = retrieve_aggregate_datasets(dataset_path, mix_speakers)    
     combined_df['labels'] = combined_df.apply(lambda row: [int(row[label]) for label in label_list], axis=1)
     combined_df = combined_df[list(set(list(combined_df.columns)) - set(label_list + ['valence']))]
 

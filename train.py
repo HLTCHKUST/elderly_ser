@@ -148,9 +148,9 @@ def main():
     # ]
 
     print('Loading dataset...')
-    dataset_dict = data_loader.load_dataset(data_args.dataset_path)
+    dataset_dict = data_loader.load_dataset(data_args.dataset_path, mix_speakers=data_args.mix_speakers)
     # print(dataset_dict)
-    
+
     train_dsets = []
     valid_dsets = []
     test_dsets = {}

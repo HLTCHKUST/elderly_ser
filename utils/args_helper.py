@@ -63,7 +63,10 @@ class DataTrainingArguments:
     validation_age_group: Optional[str] = field(
         default='all', 
         metadata={"help": "Age group used for training (all / elderly / others)"}
-    )    
+    )  
+    mix_speakers: bool = field(
+        default=True, metadata={"help": "Only for the Yuemotion Dataset, set to True for mixing speakers in each splits, set to False to have same speakers in each splits"}
+    )  
 
 @dataclass
 class ModelArguments:
