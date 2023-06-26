@@ -1,21 +1,18 @@
-# elderly_asr_emotion_recognition
-Emotion recogition from speech of elderly users
+# Cross-Lingual Cross-Age Group Adaptation for Low-Resource Elderly Speech Emotion Recognition
+In this work, we study the prospect of transferring emotion recognition ability over various age groups and languages through the utilization of multilingual pre-trained speech models. In this work, we develop two speech emotion recognition resources, i.e., BiMotion and YueMotion. 
+- **BiMotion** is a bi-lingual bi-age-group speech emotion recognition benchmark that covers 6 adult and elderly speech emotion recognition datasets from English and Mandarin Chinese.
+- **YueMotion** is a newly-constructed publicly-available Cantonese speech emotion recognition dataset.
 
-### Label source
-- Crema -> Filename (<Actor_id>_<Sentence_id>_<Emotion_id>_<Emotion_level>)
-- EmoReact -> Labels/*_labels.text (CSV)
-- ElderReact -> ElderReact-master/Annotations/*_labels.txt (CSV)
-- EmotionLines -> Friends/friend_*.json (text-only)
-- ESD -> Folder Name
-- Chinese-Speech-Emotion-Datasets -> Folder Name (Pos / Neg / Neu)
-- Tress -> Filename (OAF -> Old Adult Female, YAF -> Young Adult Female)
-- IEMOCAP -> meta.pkl
-- CMU_MOSEI -> meta.pkl
+### Publication
+```
+TODO
+```
 
-### Dataset used
+### Datasets
 - Crema -> Single label
 - ElderReact -> Multi label
 - ESD -> Single label
 - Chinese-Speech-Emotion-Datasets -> Single label
 - Tress -> Single label
 - IEMOCAP -> Single label
+- YueMotion -> Single label
