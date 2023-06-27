@@ -4,6 +4,9 @@ In this work, we study the prospect of transferring emotion recognition ability 
 - **YueMotion** is a newly-constructed publicly-available Cantonese speech emotion recognition dataset.
 
 ### Publication
+Our paper will be published at INTERSPEECH 2023. In the mean, you can find our paper on (arXiv)[https://arxiv.org/abs/2306.14517].
+If you find our work useful, please consider citing our paper as follow:
+
 ```
 @misc{cahyawijaya2023crosslingual,
       title={Cross-Lingual Cross-Age Group Adaptation for Low-Resource Elderly Speech Emotion Recognition}, 
