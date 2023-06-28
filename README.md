@@ -8,7 +8,7 @@ In this work, we study the prospect of transferring emotion recognition ability 
 
 YueMotion, which is the Cantonese speech emotion recognition dataset we collect, is available on [HuggingFace](https://huggingface.co/datasets/CAiRE/YueMotion).
 
-## Fine-tuned Checkpoints
+## Fine-tuned Model Checkpoints
 
 - English-Chinese all age: [HuggingFace](https://huggingface.co/CAiRE/SER-wav2vec2-large-xlsr-53-eng-zho-all-age)
 - English-Chinese elderly: [HuggingFace](https://huggingface.co/CAiRE/SER-wav2vec2-large-xlsr-53-eng-zho-elderly)
