@@ -29,13 +29,3 @@ If you find our work useful, please consider citing our paper as follows:
       primaryClass={cs.CL}
 }
 ```
-
-### BiMotion Benchmark
-
-- Crema -> Single label
-- ElderReact -> Multi label
-- ESD -> Single label
-- Chinese-Speech-Emotion-Dataset (CSED) -> Single label
-- Tress -> Single label
-- IEMOCAP -> Single label
-- YueMotion -> Single label
